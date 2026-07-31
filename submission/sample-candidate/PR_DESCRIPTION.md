@@ -95,24 +95,21 @@ go build ./...                                # succeeds
 go test ./... -count=1                        # all tests pass (handler package)
 cd infra/terraform && terraform fmt -check -recursive   # clean
 terraform init -backend=false && terraform validate      # "Success! The configuration is valid."
+make up                                        # cluster, DB, and app deployed successfully
+kubectl --context kind-config-service -n config-service get pods
+make smoke-test                               # all end-to-end checks pass
 ```
 
 Note: `go test ./... -race` could not be run in this environment because cgo is
 not configured locally (no C toolchain); this is a local machine limitation,
 not a code issue.
 
-**Not executed** — `make up` (kind cluster + terraform apply + image
-build/load + `kubectl apply` + rollout) and `make smoke-test` could not be run
-in this environment. The host machine is unable to create any local WSL2/
-Hyper-V-backed VM (Docker Desktop and Podman both fail identically with a
-Windows HCS logon-type error, `Wsl/Service/RegisterDistro/CreateVm/HCS/`
-`0x80070569`), confirmed to be enforced even under full local Administrator
-elevation — i.e. a managed-device policy restriction outside the scope of
-this submission to work around. The Kubernetes manifests, Terraform, and
-Dockerfile were manually reviewed for correctness (namespace/selector/
-Secret/ConfigMap name consistency between Terraform and `k8s/`, correct
-probe paths, correct multi-stage build), but the live end-to-end deploy and
-smoke test are unverified pending access to an unrestricted environment.
+Live deployment was validated on a fresh `kind` cluster. Both
+`config-service` and `postgres-0` reached `1/1 Running`, and the smoke test
+confirmed `/ping`, `/readyz`, configuration creation and retrieval, and the
+expected `404` response for an unknown configuration ID. Direct Docker Hub
+access timed out in the validation environment, so the required public images
+were fetched through `mirror.gcr.io`; this did not require repository changes.
 
 ## Known Limitations / Next Steps
 
@@ -135,13 +132,9 @@ smoke test are unverified pending access to an unrestricted environment.
   documentation.
 - Personally verified: the Go code builds and passes `go vet`, `gofmt -l`,
   and `go test ./... -count=1`; `terraform fmt -check` and `terraform validate`
-  pass; the Kubernetes manifests were manually reviewed for internal
-  consistency (namespace, selectors, and Secret/ConfigMap names referenced
-  by the Deployment matching what Terraform creates). The full
-  `make up` → `make smoke-test` flow was **not** executed against a real
-  `kind` cluster — this environment cannot create local WSL2/Hyper-V VMs
-  (see Validation section), so live deployment and the smoke test remain
-  unverified.
+  pass; the Docker image builds; the Kubernetes manifests deploy successfully;
+  and the full `make up` → `make smoke-test` flow passes against a real local
+  `kind` cluster with PostgreSQL.
 - Engineering judgment was applied to decide the Terraform/kubectl
   boundary, which schema constraints matter, and which production
   concerns to explicitly call out as out-of-scope rather than silently
@@ -152,12 +145,7 @@ smoke test are unverified pending access to an unrestricted environment.
 - [x] Go formatting and linting pass
 - [x] Tests pass (`-race` not run locally; no cgo toolchain in this environment)
 - [x] Terraform format and validate pass
-- [x] Kubernetes manifests validated (structural/manual review only — not
-      applied to a live cluster in this environment)
-- [ ] Docker image builds (not verified locally — no working container
-      runtime available; see Validation section)
-- [ ] README was tested from a clean setup (blocked by the same container
-      runtime restriction)
-- [ ] End-to-end flow was validated locally (blocked by the same container
-      runtime restriction — Docker Desktop and Podman both fail with a
-      Windows HCS VM-creation policy error on this machine)
+- [x] Kubernetes manifests applied successfully to a live `kind` cluster
+- [x] Docker image builds
+- [x] README deployment flow was tested from a fresh cluster
+- [x] End-to-end flow was validated locally
