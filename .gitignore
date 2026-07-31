@@ -1,0 +1,21 @@
+# Terraform working directories and transient files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Local override files
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Local build artifacts
+config-service
+*.exe
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db

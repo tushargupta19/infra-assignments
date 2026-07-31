@@ -28,6 +28,11 @@ spec:
             - configMapRef:
                 name: config-service
           env:
+            # Populated by Terraform (infra/terraform/postgres.tf) once the
+            # database is provisioned. `optional: true` lets the pod still
+            # start (and serve via the in-memory repository) if Terraform
+            # has not been applied yet, which keeps the deployment order
+            # forgiving for local iteration. See README "Configuration".
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -35,6 +40,9 @@ spec:
                   key: DATABASE_URL
                   optional: true
           livenessProbe:
+            # Liveness never touches the database: a slow/unavailable DB
+            # should not cause Kubernetes to kill and restart a healthy
+            # process (that would just cause a restart loop).
             httpGet:
               path: /ping
               port: 8080
@@ -42,8 +50,11 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
+            # Readiness checks DB connectivity, so the pod is removed from
+            # the Service's endpoints (no traffic routed to it) while the
+            # database is unreachable, without killing the process.
             httpGet:
-              path: /ping
+              path: /readyz
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -62,3 +73,4 @@ spec:
             runAsUser: 65532
       securityContext:
         runAsNonRoot: true
+

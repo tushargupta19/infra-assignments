@@ -12,9 +12,15 @@ import (
 var ErrNotFound = errors.New("config not found")
 
 // Repository defines storage operations for Config records.
+//
+// Ping reports whether the underlying storage is reachable and is used to
+// back the /readyz endpoint. It lets the handler distinguish "the process is
+// alive" (liveness, /ping) from "the service can serve real traffic"
+// (readiness, /readyz) without leaking storage details into the HTTP layer.
 type Repository interface {
 	Get(ctx context.Context, id string) (*domain.Config, error)
 	Upsert(ctx context.Context, cfg *domain.Config) error
+	Ping(ctx context.Context) error
 }
 
 // InMemory is a thread-safe, in-memory Repository implementation.
@@ -49,5 +55,11 @@ func (r *InMemory) Upsert(_ context.Context, cfg *domain.Config) error {
 
 	r.data[cfg.ID] = cfg
 
+	return nil
+}
+
+// Ping always succeeds for the in-memory repository: there is no external
+// dependency to check.
+func (r *InMemory) Ping(_ context.Context) error {
 	return nil
 }
